@@ -27,19 +27,22 @@ import "com.androlua.Http"
 import "cjson"
 
 -------------------------------------------------
--- AUTO UPDATE SETTINGS
+-- AUTO UPDATE SETTINGS (USING VERSION.TXT)
 -------------------------------------------------
 local UPDATE_PREF_NAME = "UpdatePref"
 local updatePref = service.getSharedPreferences(UPDATE_PREF_NAME, Context.MODE_PRIVATE)
 local updateEditor = updatePref.edit()
 
 -- CHANGE THESE VALUES ACCORDING TO YOUR GITHUB REPO
-local GITHUB_USERNAME = "SmartTechSabir"
+local GITHUB_USERNAME = "umerc5723-hub"
 local GITHUB_REPO = "AI-Voice-Typer"
-local CURRENT_VERSION = "2.0"
+local CURRENT_VERSION = "1.1"
+
+-- Main extension path
+local EXTENSION_PATH = "/storage/emulated/0/解说/Plugins/AI Voice Typer/main.lua"
 
 function getLatestVersionFromGitHub()
-    local url = "https://api.github.com/repos/" .. GITHUB_USERNAME .. "/" .. GITHUB_REPO .. "/releases/latest"
+    local url = "https://raw.githubusercontent.com/" .. GITHUB_USERNAME .. "/" .. GITHUB_REPO .. "/main/version.txt"
     local result = ""
     local success = false
     
@@ -55,11 +58,9 @@ function getLatestVersionFromGitHub()
         local responseCode = conn.getResponseCode()
         if responseCode == 200 then
             local reader = BufferedReader(InputStreamReader(conn.getInputStream()))
-            local line = ""
-            while true do
-                line = reader.readLine()
-                if line == nil then break end
-                result = result .. line
+            local line = reader.readLine()
+            if line then
+                result = line:gsub("^%s+", ""):gsub("%s+$", "")
             end
             reader.close()
             success = true
@@ -68,16 +69,9 @@ function getLatestVersionFromGitHub()
     end)
     
     if success and result ~= "" then
-        local ok, data = pcall(cjson.decode, result)
-        if ok and data then
-            local latestVersion = data.tag_name
-            if latestVersion then
-                latestVersion = latestVersion:gsub("^v", "")
-                return latestVersion, data.body or ""
-            end
-        end
+        return result
     end
-    return nil, nil
+    return nil
 end
 
 function compareVersions(v1, v2)
@@ -101,11 +95,59 @@ function compareVersions(v1, v2)
     return 0
 end
 
+function downloadAndUpdateScript(latestVersion)
+    local downloadUrl = "https://raw.githubusercontent.com/" .. GITHUB_USERNAME .. "/" .. GITHUB_REPO .. "/main/main.lua"
+    
+    service.speak("Downloading update...")
+    
+    local content = ""
+    local success = false
+    
+    local conn = nil
+    pcall(function()
+        local httpURL = URL(downloadUrl)
+        conn = httpURL.openConnection()
+        conn.setRequestMethod("GET")
+        conn.setConnectTimeout(10000)
+        conn.setReadTimeout(10000)
+        conn.connect()
+        
+        local responseCode = conn.getResponseCode()
+        if responseCode == 200 then
+            local reader = BufferedReader(InputStreamReader(conn.getInputStream()))
+            local line = ""
+            while true do
+                line = reader.readLine()
+                if line == nil then break end
+                content = content .. line .. "\n"
+            end
+            reader.close()
+            success = true
+        end
+        conn.disconnect()
+    end)
+    
+    if success and content ~= "" then
+        local file = File(EXTENSION_PATH)
+        local parentDir = file.getParentFile()
+        if parentDir and not parentDir.exists() then
+            parentDir.mkdirs()
+        end
+        
+        local fw = FileWriter(EXTENSION_PATH, false)
+        fw.write(content)
+        fw.close()
+        
+        return true
+    end
+    return false
+end
+
 function checkForUpdate(showNoUpdateMessage)
-    local latestVersion, changelog = getLatestVersionFromGitHub()
+    local latestVersion = getLatestVersionFromGitHub()
     
     if latestVersion and compareVersions(latestVersion, CURRENT_VERSION) > 0 then
-        showUpdateDialog(latestVersion, changelog)
+        showUpdateDialog(latestVersion)
         return true
     else
         if showNoUpdateMessage then
@@ -115,16 +157,23 @@ function checkForUpdate(showNoUpdateMessage)
     end
 end
 
-function showUpdateDialog(latestVersion, changelog)
+function showUpdateDialog(latestVersion)
     local builder = AlertDialog.Builder(service)
     builder.setTitle("📱 Update Available!")
-    builder.setMessage("Current Version: " .. CURRENT_VERSION .. "\nNew Version: " .. latestVersion .. "\n\nWhat's New:\n" .. (changelog or "Bug fixes and improvements") .. "\n\nDo you want to update?")
+    builder.setMessage("Current Version: " .. CURRENT_VERSION .. "\nNew Version: " .. latestVersion .. "\n\nDo you want to update now?\n\n⚠️ Extension will restart after update.")
     
-    builder.setPositiveButton("Update", DialogInterface.OnClickListener({
+    builder.setPositiveButton("Update Now", DialogInterface.OnClickListener({
         onClick = function(dialog, which)
-            local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/" .. GITHUB_USERNAME .. "/" .. GITHUB_REPO .. "/releases/latest"))
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            service.startActivity(intent)
+            service.speak("Updating... Please wait")
+            local success = downloadAndUpdateScript(latestVersion)
+            if success then
+                service.speak("Update successful! Restarting extension...")
+                service.stopSelf()
+                local intent = Intent(service, service.getClass())
+                service.startService(intent)
+            else
+                service.speak("Update failed! Please check your internet connection")
+            end
             dialog.dismiss()
         end
     }))
@@ -622,7 +671,7 @@ function callOpenRouterAPI(apiKey, model, prompt, callback)
     local headers = {
         ["Content-Type"] = "application/json",
         ["Authorization"] = "Bearer " .. apiKey,
-        ["HTTP-Referer"] = "https://github.com/SmartTechSabir",
+        ["HTTP-Referer"] = "https://github.com/umerc5723-hub",
         ["X-Title"] = "AI Voice Typer"
     }
     local payload = {
@@ -1011,7 +1060,7 @@ end
 
 local selectedLangName = getLanguageNameFromCode(savedLang)
 
--- Language texts (5 languages) with Developer: Friends Star
+-- Language texts (5 languages) with Developer: Friends Star and Version 1.1
 local texts = {
     english = {
         app_title = "AI Voice Typer", developer = "Developer: Friends Star",
@@ -1036,12 +1085,14 @@ local texts = {
         view_dict_title = "View Dictionary (Tap to Edit/Delete)", edit_delete = "Edit / Delete: ",
         wrong_word = "Wrong Word:", correct_word = "Correct Word:", update = "Update", delete = "Delete",
         about_title = "About AI Voice Typer", close = "Close", select_ext_lang = "Select Extension Language",
-        welcome_msg = "is ready to use.", version = "Version: 2.0",
+        welcome_msg = "is ready to use.", version = "Version: 1.1",
         no_textbox_title = "No Text Box Found",
         no_textbox_msg = "No text box is currently focused on screen.",
-        about_text = "AI Voice Typer\nDeveloper: Friends Star\nVersion: 2.0\nFeatures:\n• Voice to text in 148 languages\n• Roman Typing Mode\n• Dictionary for word replacements\n• AI Engine with 4 providers\n• Translation to 133 languages\n• Emoji support\n• Punctuation ON/OFF\n• Sound Effects & Background Music",
+        about_text = "AI Voice Typer\nDeveloper: Friends Star\nVersion: 1.1\nFeatures:\n• Voice to text in 148 languages\n• Roman Typing Mode\n• Dictionary for word replacements\n• AI Engine with 4 providers\n• Translation to 133 languages\n• Emoji support\n• Punctuation ON/OFF\n• Sound Effects & Background Music\n\n📱 Join My WhatsApp Talking Group",
         whatsapp_community = "Join WhatsApp Community", subscribe_youtube = "Subscribe YouTube Channel",
-        follow_telegram = "Join Telegram Channel", check_update = "Check for Updates", goodbye = "Goodbye! Please remember us in your prayers."
+        follow_telegram = "Join Telegram Channel", check_update = "Check for Updates", 
+        join_whatsapp_group = "Join My WhatsApp Talking Group",
+        goodbye = "Goodbye! Please remember us in your prayers."
     },
     urdu = {
         app_title = "AI وائس ٹائپر", developer = "ڈویلپر: Friends Star",
@@ -1068,10 +1119,12 @@ local texts = {
         about_title = "AI وائس ٹائپر کے بارے میں", close = "بند کریں",
         select_ext_lang = "ایکسٹینشن زبان منتخب کریں",
         welcome_msg = "استعمال کے لیے تیار ہے۔",
-        version = "ورژن: 2.0",
-        about_text = "AI وائس ٹائپر\nڈویلپر: Friends Star\nورژن: 2.0\nفیچرز:\n• 148 زبانوں میں وائس ٹو ٹیکسٹ\n• رومن ٹائپنگ موڈ\n• ڈکشنری برائے الفاظ کی تبدیلی\n• AI انجن - 4 پرووائیڈرز\n• 133 زبانوں میں ترجمہ\n• ایموجی سپورٹ\n• پنکچویشن آن/آف\n• صوتی اثرات اور پس منظر موسیقی",
+        version = "ورژن: 1.1",
+        about_text = "AI وائس ٹائپر\nڈویلپر: Friends Star\nورژن: 1.1\nفیچرز:\n• 148 زبانوں میں وائس ٹو ٹیکسٹ\n• رومن ٹائپنگ موڈ\n• ڈکشنری برائے الفاظ کی تبدیلی\n• AI انجن - 4 پرووائیڈرز\n• 133 زبانوں میں ترجمہ\n• ایموجی سپورٹ\n• پنکچویشن آن/آف\n• صوتی اثرات اور پس منظر موسیقی\n\n📱 میرے واٹس ایپ ٹاکنگ گروپ میں شامل ہوں",
         whatsapp_community = "WhatsApp کمیونٹی جوائن کریں", subscribe_youtube = "YouTube چینل سبسکرائب کریں",
-        follow_telegram = "ٹیلیگرام چینل جوائن کریں", check_update = "اپ ڈیٹ چیک کریں", goodbye = "خدا حافظ! ہمیں اپنی دعاؤں میں یاد رکھیں۔"
+        follow_telegram = "ٹیلیگرام چینل جوائن کریں", check_update = "اپ ڈیٹ چیک کریں",
+        join_whatsapp_group = "میرے واٹس ایپ ٹاکنگ گروپ میں شامل ہوں",
+        goodbye = "خدا حافظ! ہمیں اپنی دعاؤں میں یاد رکھیں۔"
     },
     hindi = {
         app_title = "AI वॉइस टाइपर", developer = "डेवलपर: Friends Star",
@@ -1098,10 +1151,12 @@ local texts = {
         about_title = "AI वॉइस टाइपर के बारे में", close = "बंद करें",
         select_ext_lang = "एक्सटेंशन भाषा चुनें",
         welcome_msg = "उपयोग के लिए तैयार है।",
-        version = "संस्करण: 2.0",
-        about_text = "AI वॉइस टाइपर\nडेवलपर: Friends Star\nसंस्करण: 2.0\nविशेषताएं:\n• 148 भाषाओं में वॉइस टू टेक्स्ट\n• रोमन टाइपिंग मोड\n• शब्दकोश\n• AI इंजन - 4 प्रोवाइडर्स\n• 133 भाषाओं में अनुवाद\n• इमोजी समर्थन\n• विराम चिह्न चालू/बंद\n• ध्वनि प्रभाव और पृष्ठभूमि संगीत",
+        version = "संस्करण: 1.1",
+        about_text = "AI वॉइस टाइपर\nडेवलपर: Friends Star\nसंस्करण: 1.1\nविशेषताएं:\n• 148 भाषाओं में वॉइस टू टेक्स्ट\n• रोमन टाइपिंग मोड\n• शब्दकोश\n• AI इंजन - 4 प्रोवाइडर्स\n• 133 भाषाओं में अनुवाद\n• इमोजी समर्थन\n• विराम चिह्न चालू/बंद\n• ध्वनि प्रभाव और पृष्ठभूमि संगीत\n\n📱 मेरे व्हाट्सएप टॉकिंग ग्रुप से जुड़ें",
         whatsapp_community = "WhatsApp समुदाय से जुड़ें", subscribe_youtube = "YouTube चैनल सब्सक्राइब करें",
-        follow_telegram = "टेलीग्राम चैनल ज्वाइन करें", check_update = "अपडेट जांचें", goodbye = "अलविदा! हमें अपनी दुआओं में याद रखना।"
+        follow_telegram = "टेलीग्राम चैनल ज्वाइन करें", check_update = "अपडेट जांचें",
+        join_whatsapp_group = "मेरे व्हाट्सएप टॉकिंग ग्रुप से जुड़ें",
+        goodbye = "अलविदा! हमें अपनी दुआओं में याद रखना।"
     },
     punjabi = {
         app_title = "AI ਵੌਇਸ ਟਾਈਪਰ", developer = "ਡਿਵੈਲਪਰ: Friends Star",
@@ -1128,10 +1183,12 @@ local texts = {
         about_title = "AI ਵੌਇਸ ਟਾਈਪਰ ਬਾਰੇ", close = "ਬੰਦ ਕਰੋ",
         select_ext_lang = "ਐਕਸਟੈਂਸ਼ਨ ਭਾਸ਼ਾ ਚੁਣੋ",
         welcome_msg = "ਵਰਤੋਂ ਲਈ ਤਿਆਰ ਹੈ।",
-        version = "ਵਰਜਨ: 2.0",
-        about_text = "AI ਵੌਇਸ ਟਾਈਪਰ\nਡਿਵੈਲਪਰ: Friends Star\nਵਰਜਨ: 2.0\nਫੀਚਰ:\n• 148 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਵੌਇਸ ਟੂ ਟੈਕਸਟ\n• ਰੋਮਨ ਟਾਈਪਿੰਗ ਮੋਡ\n• ਸ਼ਬਦਕੋਸ਼\n• AI ਇੰਜਣ - 4 ਪ੍ਰੋਵਾਈਡਰ\n• 133 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਅਨੁਵਾਦ\n• ਇਮੋਜੀ ਸਹਾਇਤਾ\n• ਵਿਰਾਮ ਚਿੰਨ੍ਹ ਚਾਲੂ/ਬੰਦ\n• ਆਵਾਜ਼ ਪ੍ਰਭਾਵ ਅਤੇ ਪਿਛੋਕੜ ਸੰਗੀਤ",
+        version = "ਵਰਜਨ: 1.1",
+        about_text = "AI ਵੌਇਸ ਟਾਈਪਰ\nਡਿਵੈਲਪਰ: Friends Star\nਵਰਜਨ: 1.1\nਫੀਚਰ:\n• 148 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਵੌਇਸ ਟੂ ਟੈਕਸਟ\n• ਰੋਮਨ ਟਾਈਪਿੰਗ ਮੋਡ\n• ਸ਼ਬਦਕੋਸ਼\n• AI ਇੰਜਣ - 4 ਪ੍ਰੋਵਾਈਡਰ\n• 133 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਅਨੁਵਾਦ\n• ਇਮੋਜੀ ਸਹਾਇਤਾ\n• ਵਿਰਾਮ ਚਿੰਨ੍ਹ ਚਾਲੂ/ਬੰਦ\n• ਆਵਾਜ਼ ਪ੍ਰਭਾਵ ਅਤੇ ਪਿਛੋਕੜ ਸੰਗੀਤ\n\n📱 ਮੇਰੇ ਵਟਸਐਪ ਟਾਕਿੰਗ ਗਰੁੱਪ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ",
         whatsapp_community = "WhatsApp ਕਮਿਊਨਿਟੀ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ", subscribe_youtube = "YouTube ਚੈਨਲ ਸਬਸਕ੍ਰਾਈਬ ਕਰੋ",
-        follow_telegram = "ਟੈਲੀਗ੍ਰਾਮ ਚੈਨਲ ਜੁਆਇਨ ਕਰੋ", check_update = "ਅੱਪਡੇਟ ਚੈੱਕ ਕਰੋ", goodbye = "ਅਲਵਿਦਾ! ਸਾਨੂੰ ਆਪਣੀਆਂ ਦੁਆਵਾਂ ਵਿੱਚ ਯਾਦ ਰੱਖਣਾ।"
+        follow_telegram = "ਟੈਲੀਗ੍ਰਾਮ ਚੈਨਲ ਜੁਆਇਨ ਕਰੋ", check_update = "ਅੱਪਡੇਟ ਚੈੱਕ ਕਰੋ",
+        join_whatsapp_group = "ਮੇਰੇ ਵਟਸਐਪ ਟਾਕਿੰਗ ਗਰੁੱਪ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ",
+        goodbye = "ਅਲਵਿਦਾ! ਸਾਨੂੰ ਆਪਣੀਆਂ ਦੁਆਵਾਂ ਵਿੱਚ ਯਾਦ ਰੱਖਣਾ।"
     },
     sindhi = {
         app_title = "AI وائس ٽائپر", developer = "ڊولپر: Friends Star",
@@ -1158,10 +1215,12 @@ local texts = {
         about_title = "AI وائس ٽائپر بابت", close = "بند ڪريو",
         select_ext_lang = "ايڪسٽينشن ٻولي چونڊيو",
         welcome_msg = "استعمال لاءِ تيار آهي.",
-        version = "ورزن: 2.0",
-        about_text = "AI وائس ٽائپر\nڊولپر: Friends Star\nورزن: 2.0\nفيچرز:\n• 148 ٻولين ۾ وائس ٽو ٽيڪسٽ\n• رومن ٽائپنگ موڊ\n• لغت\n• AI انجڻ - 4 پرووائڊرز\n• 133 ٻولين ۾ ترجمو\n• ايموجي سپورٽ\n• پنڪچويشن آن/آف\n• آواز جا اثر ۽ پس منظر موسيقي",
+        version = "ورزن: 1.1",
+        about_text = "AI وائس ٽائپر\nڊولپر: Friends Star\nورزن: 1.1\nفيچرز:\n• 148 ٻولين ۾ وائس ٽو ٽيڪسٽ\n• رومن ٽائپنگ موڊ\n• لغت\n• AI انجڻ - 4 پرووائڊرز\n• 133 ٻولين ۾ ترجمو\n• ايموجي سپورٽ\n• پنڪچويشن آن/آف\n• آواز جا اثر ۽ پس منظر موسيقي\n\n📱 منهنجي واٽس ايپ ٽاڪنگ گروپ ۾ شامل ٿيو",
         whatsapp_community = "WhatsApp ڪميونٽي ۾ شامل ٿيو", subscribe_youtube = "YouTube چينل سبسڪرائب ڪريو",
-        follow_telegram = "ٽيليگرام چينل جوائن ڪريو", check_update = "اپڊيٽ چيڪ ڪريو", goodbye = "الله حافظ! اسان کي پنهنجين دعائن ۾ ياد رکو."
+        follow_telegram = "ٽيليگرام چينل جوائن ڪريو", check_update = "اپڊيٽ چيڪ ڪريو",
+        join_whatsapp_group = "منهنجي واٽس ايپ ٽاڪنگ گروپ ۾ شامل ٿيو",
+        goodbye = "الله حافظ! اسان کي پنهنجين دعائن ۾ ياد رکو."
     }
 }
 
@@ -1781,7 +1840,7 @@ function showExtensionSettings()
     end
     mainLayout.addView(emojiBtn)
     
-    -- Check for Updates Button (NEW)
+    -- Check for Updates Button
     local updateBtn = Button(service)
     updateBtn.setText(getText("check_update"))
     updateBtn.setTextSize(14)
@@ -2493,7 +2552,14 @@ end
 
 function joinWhatsAppCommunity()
     playClickSound()
-    local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/F3J4LOMY05uD9bxHgM5wS8"))
+    local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/CIov5nwVSkGA6R4Aya44Ff"))
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    service.startActivity(intent)
+end
+
+function joinWhatsAppTalkingGroup()
+    playClickSound()
+    local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/CIov5nwVSkGA6R4Aya44Ff"))
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     service.startActivity(intent)
 end
@@ -2530,6 +2596,7 @@ function showAbout()
         {Button; text = getText("follow_tiktok"); onClick = function() aboutDialog.dismiss(); followTikTok() end};
         {Button; text = getText("subscribe_youtube"); onClick = function() aboutDialog.dismiss(); followYouTube() end};
         {Button; text = getText("follow_telegram"); onClick = function() aboutDialog.dismiss(); followTelegram() end};
+        {Button; text = getText("join_whatsapp_group"); onClick = function() aboutDialog.dismiss(); joinWhatsAppTalkingGroup() end};
         {Button; text = getText("whatsapp_community"); onClick = function() aboutDialog.dismiss(); joinWhatsAppCommunity() end};
         {Button; text = "🔘 Back to Main Menu"; onClick = function() aboutDialog.dismiss(); showMainDialog() end};
     }
