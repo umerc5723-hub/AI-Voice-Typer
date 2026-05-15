@@ -208,7 +208,8 @@ local AI_PROVIDERS = {
 local TYPING_MODES = {
     "Conversion Mode",
     "Intelligent Writer Mode",
-    "Only Selected Language Mode"
+    "Only Selected Language Mode",
+    "Roman Typing Mode"
 }
 
 function getSelectedTypingMode()
@@ -750,7 +751,79 @@ function callGroqAPI(apiKey, model, prompt, callback)
     end)
 end
 
--- ==================== MAIN PROCESS FUNCTION ====================
+-- ==================== IMPROVED ROMAN URDU MAP (COMPLETE) ====================
+local romanUrduMap = {
+    -- Common words
+    ["السلام"] = "assalam", ["علیکم"] = "alaikum", ["السلام علیکم"] = "assalam o alaikum",
+    ["وعلیکم السلام"] = "wa alaikum assalam", ["کیسے"] = "kaise", ["ہیں"] = "hain",
+    ["آپ"] = "aap", ["میں"] = "main", ["تم"] = "tum", ["وہ"] = "woh", ["یہ"] = "yeh",
+    ["ہے"] = "hai", ["ہوں"] = "hoon", ["تھا"] = "tha", ["تھی"] = "thi", ["تھے"] = "thay",
+    ["کر"] = "kar", ["کرنا"] = "karna", ["کرو"] = "karo", ["کیا"] = "kia", ["کی"] = "ki",
+    ["کے"] = "ke", ["سے"] = "se", ["پر"] = "par", ["کو"] = "ko", ["نے"] = "ne",
+    ["اور"] = "aur", ["تو"] = "to", ["بھی"] = "bhi", ["تک"] = "tak", ["لئے"] = "liye",
+    ["ہی"] = "hi", ["اب"] = "ab", ["پھر"] = "phir", ["اگر"] = "agar", ["ورنہ"] = "warna",
+    ["لیکن"] = "lekin", ["کیونکے"] = "kyunke", ["اس"] = "is", ["اسے"] = "isay",
+    ["ان"] = "in", ["انہیں"] = "inhain", ["آج"] = "aaj", ["کل"] = "kal", ["آج کل"] = "aaj kal",
+    ["صبح"] = "subah", ["شام"] = "shaam", ["رات"] = "raat", ["دن"] = "din", ["ہفتہ"] = "hafta",
+    ["مہینہ"] = "maheena", ["سال"] = "saal", ["بہت"] = "bohat", ["تھوڑا"] = "thora",
+    ["زیادہ"] = "zyada", ["کم"] = "kam", ["اچھا"] = "acha", ["برا"] = "bura",
+    ["ٹھیک"] = "theek", ["غلط"] = "ghalat", ["نیا"] = "naya", ["پرانا"] = "purana",
+    ["بڑا"] = "bara", ["چھوٹا"] = "chota", ["پاس"] = "paas", ["دور"] = "door",
+    ["اندر"] = "andar", ["باہر"] = "bahar", ["اوپر"] = "oopar", ["نیچے"] = "neeche",
+    ["دائیں"] = "dayen", ["بائیں"] = "bayen", ["سامنے"] = "samnay", ["پیچھے"] = "peechay",
+    ["میرا"] = "mera", ["تیرا"] = "tera", ["اس کا"] = "us ka", ["ہمارا"] = "hamara",
+    ["تمہارا"] = "tumhara", ["ان کا"] = "un ka", ["جا"] = "ja", ["آ"] = "aa", ["دے"] = "de",
+    ["لے"] = "le", ["رکھ"] = "rakh", ["لکھ"] = "likh", ["پڑھ"] = "parh", ["سن"] = "sun",
+    ["بول"] = "bol", ["دیکھ"] = "dekh", ["چل"] = "chal", ["بیٹھ"] = "baith", ["اٹھ"] = "uth",
+    ["سو"] = "so", ["کھا"] = "kha", ["پی"] = "pee", ["خوش"] = "khush", ["غمگین"] = "ghamgeen",
+    ["پیار"] = "pyaar", ["محبت"] = "mohabbat", ["دوستی"] = "dosti", ["دشمنی"] = "dushmani",
+    ["بھائی"] = "bhai", ["بہن"] = "behan", ["ماں"] = "maa", ["باپ"] = "baap", ["بیٹا"] = "beta",
+    ["بیٹی"] = "beti", ["دادا"] = "dada", ["دادی"] = "dadi", ["نانا"] = "nana", ["نانی"] = "nani",
+    ["چچا"] = "chacha", ["چچی"] = "chachi", ["خالہ"] = "khala", ["خالو"] = "khalu",
+    ["ماموں"] = "mamoon", ["پھوپھی"] = "phophi", ["انکل"] = "uncle", ["آنٹی"] = "aunty",
+    ["سکول"] = "school", ["کالج"] = "college", ["یونیورسٹی"] = "university",
+    ["پاکستان"] = "Pakistan", ["انڈیا"] = "India", ["امریکہ"] = "America",
+    ["انگلینڈ"] = "England", ["چین"] = "China", ["جاپان"] = "Japan", ["دبئی"] = "Dubai",
+    -- Islamic terms
+    ["نماز"] = "namaz", ["روزہ"] = "roza", ["حج"] = "hajj", ["زکوٰۃ"] = "zakat",
+    ["قرآن"] = "Quran", ["حدیث"] = "Hadith", ["مسجد"] = "masjid", ["مولوی"] = "molvi",
+    ["پیر"] = "peer", ["مرید"] = "murid", ["توبہ"] = "toba", ["استغفار"] = "istighfar",
+    ["الحمدللہ"] = "Alhamdulillah", ["ان شاء اللہ"] = "InshaAllah", ["ماشاء اللہ"] = "MashaAllah",
+    ["اللہ"] = "Allah", ["محمد"] = "Muhammad", ["علی"] = "Ali", ["فاطمہ"] = "Fatima",
+    -- Extra common words
+    ["کون"] = "kaun", ["کیا"] = "kya", ["کیوں"] = "kyun", ["کب"] = "kab", ["کہاں"] = "kahan",
+    ["یہاں"] = "yahan", ["وہاں"] = "wahan", ["ابھی"] = "abhi", ["پہلے"] = "pehle", ["بعد"] = "baad",
+    ["قریب"] = "qareeb", ["آہستہ"] = "ahista", ["تیز"] = "tez", ["سستا"] = "sasta", ["مہنگا"] = "mehnga",
+    ["نئی"] = "nai", ["پرانی"] = "purani", ["چھوٹی"] = "choti", ["بڑی"] = "bari",
+    ["اچھی"] = "achi", ["بری"] = "buri",
+    -- Verbs
+    ["کھانا"] = "khana", ["پینا"] = "peena", ["سونا"] = "sona", ["جاگنا"] = "jagna",
+    ["رونا"] = "rona", ["ہنسنا"] = "hansna", ["بولنا"] = "bolna", ["سننا"] = "sanna",
+    ["دیکھنا"] = "dekhna", ["چلنا"] = "chalna", ["دوڑنا"] = "daurna", ["بیٹھنا"] = "baithna",
+    ["اٹھنا"] = "uthna", ["لکھنا"] = "likhna", ["پڑھنا"] = "parhna", ["سمجھنا"] = "samajhna",
+    ["جاننا"] = "jaanna", ["ماننا"] = "maanna", ["دینا"] = "dena", ["لینا"] = "lena",
+    ["آنا"] = "aana", ["جانے"] = "jaana", ["کرنا"] = "karna", ["ہونا"] = "hona",
+}
+
+function urduToRoman(text)
+    if text == nil then return "" end
+    local result = text
+    -- First replace longer words
+    for urdu, roman in pairs(romanUrduMap) do
+        if #urdu > 1 then
+            result = result:gsub(urdu, roman)
+        end
+    end
+    -- Then replace single characters
+    for urdu, roman in pairs(romanUrduMap) do
+        if #urdu == 1 then
+            result = result:gsub(urdu, roman)
+        end
+    end
+    return result
+end
+
+-- ==================== MAIN PROCESS FUNCTION (ROMAN MODE ENHANCED) ====================
 function processWithAI(spokenText, callback)
     local provider = getSelectedAIProvider()
     local typingMode = getSelectedTypingMode()
@@ -758,6 +831,13 @@ function processWithAI(spokenText, callback)
     local targetLang = getTargetLanguageName()
     local emojiEnabled = isEmojiEnabled()
     local punctuationEnabled = isPunctuationEnabled()
+    
+    -- SPECIAL HANDLER FOR ROMAN TYPING MODE - NO AI NEEDED
+    if typingMode == "Roman Typing Mode" then
+        local romanText = urduToRoman(spokenText)
+        callback(romanText)
+        return
+    end
     
     local prompt = ""
     
@@ -836,17 +916,20 @@ local baseSoundPath = "/storage/emulated/0/解说/Plugins/AI Voice Typer/Audios/
 local openSoundPath = baseSoundPath .. "jim.m4a"
 local exitSoundPath = baseSoundPath .. "jjq.ogg"
 local backgroundMusicPath = baseSoundPath .. "sad background emotional music __ no copyright sad music ___sad _viral _sadflute _bgm _instrumental(MP3_160K).mp3"
-local clickSoundPath = baseSoundPath .. "Focus1_7.mp3"
 
 local backgroundMediaPlayer = nil
 
 function playClickSound()
+    return
+end
+
+function playOpenSound()
     if not soundEnabled then return end
-    local file = File(clickSoundPath)
+    local file = File(openSoundPath)
     if file.exists() then
         pcall(function()
             local mp = MediaPlayer()
-            mp.setDataSource(clickSoundPath)
+            mp.setDataSource(openSoundPath)
             local volume = soundEffectsVolume / 100.0
             mp.setVolume(volume, volume)
             mp.prepare()
@@ -974,7 +1057,7 @@ local languages = {
 }
 
 function getLanguageNameFromCode(code)
-    if code == nil then return "Urdu (Pakistan)" end
+    if code == nil then return "English (US)" end
     for i=1,#languages do
         local langCode = languages[i]:match("=(.+)")
         if langCode == code then
@@ -982,12 +1065,12 @@ function getLanguageNameFromCode(code)
             if name then return name end
         end
     end
-    return code
+    return "English (US)"
 end
 
--- ==================== ORIGINAL CODE VARIABLES ====================
+-- ==================== ORIGINAL CODE VARIABLES (DEFAULT LANGUAGE ENGLISH) ====================
 local prefs = service.getSharedPreferences("lang_settings", 0)
-local savedLang = prefs.getString("lang", "ur-PK")
+local savedLang = prefs.getString("lang", "en-US")
 
 local dictFilePath = service.getFilesDir().toString() .. "/dictionary.txt"
 local endTextPref = service.getSharedPreferences("end_text_pref", 0)
@@ -998,12 +1081,10 @@ local userName = namePref.getString("user_name", "")
 local hasName = namePref.getBoolean("has_name", false)
 
 local extLangPref = service.getSharedPreferences("ext_lang_pref", 0)
-local extLang = extLangPref.getString("ext_lang", "urdu")
+local extLang = extLangPref.getString("ext_lang", "english")
 
-local romanPref = service.getSharedPreferences("roman_mode_pref", 0)
-local romanModeEnabled = romanPref.getBoolean("roman_mode", false)
+local selectedLangName = getLanguageNameFromCode(savedLang)
 
--- Extension language list (5 languages)
 local extensionLangList = {
     {name="English", code="english", display="English"},
     {name="اردو", code="urdu", display="اردو"},
@@ -1012,68 +1093,18 @@ local extensionLangList = {
     {name="سنڌي", code="sindhi", display="سنڌي"}
 }
 
--- Roman Urdu conversion map
-local romanUrduMap = {
-    ["السلام"] = "assalam", ["علیکم"] = "alaikum", ["السلام علیکم"] = "assalam o alaikum",
-    ["وعلیکم السلام"] = "wa alaikum assalam", ["کیسے"] = "kaise", ["ہیں"] = "hain",
-    ["آپ"] = "aap", ["میں"] = "main", ["تم"] = "tum", ["وہ"] = "woh", ["یہ"] = "yeh",
-    ["ہے"] = "hai", ["ہوں"] = "hoon", ["تھا"] = "tha", ["تھی"] = "thi", ["تھے"] = "thay",
-    ["کر"] = "kar", ["کرنا"] = "karna", ["کرو"] = "karo", ["کیا"] = "kia", ["کی"] = "ki",
-    ["کے"] = "ke", ["سے"] = "se", ["پر"] = "par", ["کو"] = "ko", ["نے"] = "ne",
-    ["اور"] = "aur", ["تو"] = "to", ["بھی"] = "bhi", ["تک"] = "tak", ["لئے"] = "liye",
-    ["ہی"] = "hi", ["اب"] = "ab", ["پھر"] = "phir", ["اگر"] = "agar", ["ورنہ"] = "warna",
-    ["لیکن"] = "lekin", ["کیونکے"] = "kyunke", ["اس"] = "is", ["اسے"] = "isay",
-    ["ان"] = "in", ["انہیں"] = "inhain", ["آج"] = "aaj", ["کل"] = "kal", ["آج کل"] = "aaj kal",
-    ["صبح"] = "subah", ["شام"] = "shaam", ["رات"] = "raat", ["دن"] = "din", ["ہفتہ"] = "hafta",
-    ["مہینہ"] = "maheena", ["سال"] = "saal", ["بہت"] = "bohat", ["تھوڑا"] = "thora",
-    ["زیادہ"] = "zyada", ["کم"] = "kam", ["اچھا"] = "acha", ["برا"] = "bura",
-    ["ٹھیک"] = "theek", ["غلط"] = "ghalat", ["نیا"] = "naya", ["پرانا"] = "purana",
-    ["بڑا"] = "bara", ["چھوٹا"] = "chota", ["پاس"] = "paas", ["دور"] = "door",
-    ["اندر"] = "andar", ["باہر"] = "bahar", ["اوپر"] = "oopar", ["نیچے"] = "neeche",
-    ["دائیں"] = "dayen", ["بائیں"] = "bayen", ["سامنے"] = "samnay", ["پیچھے"] = "peechay",
-    ["میرا"] = "mera", ["تیرا"] = "tera", ["اس کا"] = "us ka", ["ہمارا"] = "hamara",
-    ["تمہارا"] = "tumhara", ["ان کا"] = "un ka", ["جا"] = "ja", ["آ"] = "aa", ["دے"] = "de",
-    ["لے"] = "le", ["رکھ"] = "rakh", ["لکھ"] = "likh", ["پڑھ"] = "parh", ["سن"] = "sun",
-    ["بول"] = "bol", ["دیکھ"] = "dekh", ["چل"] = "chal", ["بیٹھ"] = "baith", ["اٹھ"] = "uth",
-    ["سو"] = "so", ["کھا"] = "kha", ["پی"] = "pee", ["خوش"] = "khush", ["غمگین"] = "ghamgeen",
-    ["پیار"] = "pyaar", ["محبت"] = "mohabbat", ["دوستی"] = "dosti", ["دشمنی"] = "dushmani",
-    ["بھائی"] = "bhai", ["بہن"] = "behan", ["ماں"] = "maa", ["باپ"] = "baap", ["بیٹا"] = "beta",
-    ["بیٹی"] = "beti", ["دادا"] = "dada", ["دادی"] = "dadi", ["نانا"] = "nana", ["نانی"] = "nani",
-    ["چچا"] = "chacha", ["چچی"] = "chachi", ["خالہ"] = "khala", ["خالو"] = "khalu",
-    ["ماموں"] = "mamoon", ["پھوپھی"] = "phophi", ["انکل"] = "uncle", ["آنٹی"] = "aunty",
-    ["سکول"] = "school", ["کالج"] = "college", ["یونیورسٹی"] = "university",
-    ["پاکستان"] = "Pakistan", ["انڈیا"] = "India", ["امریکہ"] = "America",
-    ["انگلینڈ"] = "England", ["چین"] = "China", ["جاپان"] = "Japan", ["دبئی"] = "Dubai",
-}
-
-function urduToRoman(text)
-    if text == nil then return "" end
-    local result = text
-    for urdu, roman in pairs(romanUrduMap) do
-        if #urdu > 1 then result = result:gsub(urdu, roman) end
-    end
-    for urdu, roman in pairs(romanUrduMap) do
-        if #urdu == 1 then result = result:gsub(urdu, roman) end
-    end
-    return result
-end
-
-local selectedLangName = getLanguageNameFromCode(savedLang)
-
--- Language texts (5 languages) with Developer: Friends Star and Version 1.1
 local texts = {
     english = {
         app_title = "AI Voice Typer", developer = "Developer: Friends Star",
         select_lang = "Select Voice Language (148 Languages)", current_lang = "Current Language",
         add_dict = "Add Dictionary", view_dict = "View Dictionary", set_end = "Set End of Text",
-        ext_lang = "Extension Language", roman_mode = "Roman Typing",
-        roman_on = "Roman Typing: ON", roman_off = "Roman Typing: OFF",
+        ext_lang = "Extension Language", 
         about = "About", exit = "Exit", ext_settings = "Extension Settings",
         sound_effects = "Sound Effects", sound_on = "Sound: ON", sound_off = "Sound: OFF",
         bg_music = "Background Music", bg_music_on = "BG Music: ON", bg_music_off = "BG Music: OFF",
         volume_control = "Volume Control", bg_music_volume = "Background Music Volume",
         sfx_volume = "Sound Effects Volume", ai_engine = "AI Engine Settings",
-        follow_tiktok = "Follow TikTok Account", send_feedback = "Send Feedback",
+        follow_tiktok = "Follow TikTok", contact_developer = "Contact Developer",
         welcome_title = "Welcome to AI Voice Typer", enter_name = "Please enter your name:",
         your_name = "Your Name", ok = "OK", cancel = "Cancel", error = "Error",
         both_required = "Both fields are required!", saved = "Saved",
@@ -1088,10 +1119,13 @@ local texts = {
         welcome_msg = "is ready to use.", version = "Version: 1.1",
         no_textbox_title = "No Text Box Found",
         no_textbox_msg = "No text box is currently focused on screen.",
-        about_text = "AI Voice Typer\nDeveloper: Friends Star\nVersion: 1.1\nFeatures:\n• Voice to text in 148 languages\n• Roman Typing Mode\n• Dictionary for word replacements\n• AI Engine with 4 providers\n• Translation to 133 languages\n• Emoji support\n• Punctuation ON/OFF\n• Sound Effects & Background Music\n\n📱 Join My WhatsApp Talking Group",
-        whatsapp_community = "Join WhatsApp Community", subscribe_youtube = "Subscribe YouTube Channel",
-        follow_telegram = "Join Telegram Channel", check_update = "Check for Updates", 
-        join_whatsapp_group = "Join My WhatsApp Talking Group",
+        about_text = "AI Voice Typer\nDeveloper: Friends Star\nVersion: 1.1\nFeatures:\n• Voice to text in 148 languages\n• AI Engine with 4 providers\n• Translation to 133 languages\n• Emoji support\n• Punctuation ON/OFF\n• Sound Effects & Background Music",
+        whatsapp_community = "WhatsApp Community", subscribe_youtube = "Subscribe YouTube",
+        follow_telegram = "Telegram Channel", check_update = "Check for Updates", 
+        join_whatsapp_group = "WhatsApp Talking Group",
+        join_whatsapp_channel = "WhatsApp Channel",
+        join_cricket_group = "Hand Cricket Group",
+        join_social_media = "Join Social Media",
         goodbye = "Goodbye! Please remember us in your prayers."
     },
     urdu = {
@@ -1099,13 +1133,12 @@ local texts = {
         select_lang = "انتخاب زبان (148 زبانیں)", current_lang = "موجودہ زبان",
         add_dict = "ڈکشنری شامل کریں", view_dict = "ڈکشنری دیکھیں",
         set_end = "متن کے آخر میں شامل کریں", ext_lang = "ایکسٹینشن زبان",
-        roman_mode = "رومن ٹائپنگ", roman_on = "رومن ٹائپنگ: آن", roman_off = "رومن ٹائپنگ: آف",
         about = "تعارف", exit = "خارج", ext_settings = "ایکسٹینشن سیٹنگز",
         sound_effects = "صوتی اثرات", sound_on = "آواز: آن", sound_off = "آواز: آف",
         bg_music = "پس منظر موسیقی", bg_music_on = "پس منظر موسیقی: آن", bg_music_off = "پس منظر موسیقی: آف",
         volume_control = "والیوم کنٹرول", bg_music_volume = "پس منظر موسیقی والیوم",
         sfx_volume = "صوتی اثرات والیوم", ai_engine = "AI انجن سیٹنگز",
-        follow_tiktok = "ٹک ٹاک اکاؤنٹ فالو کریں", send_feedback = "فیڈبیک بھیجیں",
+        follow_tiktok = "ٹک ٹاک فالو کریں", contact_developer = "ڈویلپر سے رابطہ کریں",
         welcome_title = "AI وائس ٹائپر میں خوش آمدید", enter_name = "براہ کرم اپنا نام درج کریں:",
         your_name = "آپ کا نام", ok = "ٹھیک ہے", cancel = "منسوخ",
         error = "خرابی", both_required = "دونوں فیلڈز کی ضرورت ہے!", saved = "محفوظ",
@@ -1120,24 +1153,26 @@ local texts = {
         select_ext_lang = "ایکسٹینشن زبان منتخب کریں",
         welcome_msg = "استعمال کے لیے تیار ہے۔",
         version = "ورژن: 1.1",
-        about_text = "AI وائس ٹائپر\nڈویلپر: Friends Star\nورژن: 1.1\nفیچرز:\n• 148 زبانوں میں وائس ٹو ٹیکسٹ\n• رومن ٹائپنگ موڈ\n• ڈکشنری برائے الفاظ کی تبدیلی\n• AI انجن - 4 پرووائیڈرز\n• 133 زبانوں میں ترجمہ\n• ایموجی سپورٹ\n• پنکچویشن آن/آف\n• صوتی اثرات اور پس منظر موسیقی\n\n📱 میرے واٹس ایپ ٹاکنگ گروپ میں شامل ہوں",
-        whatsapp_community = "WhatsApp کمیونٹی جوائن کریں", subscribe_youtube = "YouTube چینل سبسکرائب کریں",
-        follow_telegram = "ٹیلیگرام چینل جوائن کریں", check_update = "اپ ڈیٹ چیک کریں",
-        join_whatsapp_group = "میرے واٹس ایپ ٹاکنگ گروپ میں شامل ہوں",
+        about_text = "AI وائس ٹائپر\nڈویلپر: Friends Star\nورژن: 1.1\nفیچرز:\n• 148 زبانوں میں وائس ٹو ٹیکسٹ\n• AI انجن - 4 پرووائیڈرز\n• 133 زبانوں میں ترجمہ\n• ایموجی سپورٹ\n• پنکچویشن آن/آف\n• صوتی اثرات اور پس منظر موسیقی",
+        whatsapp_community = "WhatsApp کمیونٹی", subscribe_youtube = "YouTube سبسکرائب کریں",
+        follow_telegram = "ٹیلیگرام چینل", check_update = "اپ ڈیٹ چیک کریں",
+        join_whatsapp_group = "WhatsApp ٹاکنگ گروپ",
+        join_whatsapp_channel = "WhatsApp چینل",
+        join_cricket_group = "ہینڈ کرکٹ گروپ",
+        join_social_media = "سوشل میڈیا میں شامل ہوں",
         goodbye = "خدا حافظ! ہمیں اپنی دعاؤں میں یاد رکھیں۔"
     },
     hindi = {
         app_title = "AI वॉइस टाइपर", developer = "डेवलपर: Friends Star",
         select_lang = "भाषा चुनें (148 भाषाएं)", current_lang = "वर्तमान भाषा",
         add_dict = "शब्दकोश जोड़ें", view_dict = "शब्दकोश देखें", set_end = "अंत में जोड़ें",
-        ext_lang = "एक्सटेंशन भाषा", roman_mode = "रोमन टाइपिंग",
-        roman_on = "रोमन टाइपिंग: चालू", roman_off = "रोमन टाइपिंग: बंद",
+        ext_lang = "एक्सटेंशन भाषा",
         about = "परिचय", exit = "बाहर जाएं", ext_settings = "एक्सटेंशन सेटिंग्स",
         sound_effects = "ध्वनि प्रभाव", sound_on = "ध्वनि: चालू", sound_off = "ध्वनि: बंद",
         bg_music = "पृष्ठभूमि संगीत", bg_music_on = "पृष्ठभूमि संगीत: चालू", bg_music_off = "पृष्ठभूमि संगीत: बंद",
         volume_control = "वॉल्यूम नियंत्रण", bg_music_volume = "पृष्ठभूमि संगीत वॉल्यूम",
         sfx_volume = "ध्वनि प्रभाव वॉल्यूम", ai_engine = "AI इंजन सेटिंग्स",
-        follow_tiktok = "TikTok अकाउंट फॉलो करें", send_feedback = "फीडबैक भेजें",
+        follow_tiktok = "TikTok फॉलो करें", contact_developer = "डेवलपर से संपर्क करें",
         welcome_title = "AI वॉइस टाइपर में आपका स्वागत है", enter_name = "कृपया अपना नाम दर्ज करें:",
         your_name = "आपका नाम", ok = "ठीक है", cancel = "रद्द करें",
         error = "त्रुटि", both_required = "दोनों फ़ील्ड आवश्यक हैं!", saved = "सहेजा गया",
@@ -1152,24 +1187,26 @@ local texts = {
         select_ext_lang = "एक्सटेंशन भाषा चुनें",
         welcome_msg = "उपयोग के लिए तैयार है।",
         version = "संस्करण: 1.1",
-        about_text = "AI वॉइस टाइपर\nडेवलपर: Friends Star\nसंस्करण: 1.1\nविशेषताएं:\n• 148 भाषाओं में वॉइस टू टेक्स्ट\n• रोमन टाइपिंग मोड\n• शब्दकोश\n• AI इंजन - 4 प्रोवाइडर्स\n• 133 भाषाओं में अनुवाद\n• इमोजी समर्थन\n• विराम चिह्न चालू/बंद\n• ध्वनि प्रभाव और पृष्ठभूमि संगीत\n\n📱 मेरे व्हाट्सएप टॉकिंग ग्रुप से जुड़ें",
-        whatsapp_community = "WhatsApp समुदाय से जुड़ें", subscribe_youtube = "YouTube चैनल सब्सक्राइब करें",
-        follow_telegram = "टेलीग्राम चैनल ज्वाइन करें", check_update = "अपडेट जांचें",
-        join_whatsapp_group = "मेरे व्हाट्सएप टॉकिंग ग्रुप से जुड़ें",
+        about_text = "AI वॉइस टाइपर\nडेवलपर: Friends Star\nसंस्करण: 1.1\nविशेषताएं:\n• 148 भाषाओं में वॉइस टू टेक्स्ट\n• AI इंजन - 4 प्रोवाइडर्स\n• 133 भाषाओं में अनुवाद\n• इमोजी समर्थन\n• विराम चिह्न चालू/बंद\n• ध्वनि प्रभाव और पृष्ठभूमि संगीत",
+        whatsapp_community = "WhatsApp समुदाय", subscribe_youtube = "YouTube सब्सक्राइब करें",
+        follow_telegram = "टेलीग्राम चैनल", check_update = "अपडेट जांचें",
+        join_whatsapp_group = "WhatsApp टॉकिंग ग्रुप",
+        join_whatsapp_channel = "WhatsApp चैनल",
+        join_cricket_group = "हैंड क्रिकेट ग्रुप",
+        join_social_media = "सोशल मीडिया से जुड़ें",
         goodbye = "अलविदा! हमें अपनी दुआओं में याद रखना।"
     },
     punjabi = {
         app_title = "AI ਵੌਇਸ ਟਾਈਪਰ", developer = "ਡਿਵੈਲਪਰ: Friends Star",
         select_lang = "ਭਾਸ਼ਾ ਚੁਣੋ (148 ਭਾਸ਼ਾਵਾਂ)", current_lang = "ਮੌਜੂਦਾ ਭਾਸ਼ਾ",
         add_dict = "ਸ਼ਬਦਕੋਸ਼ ਸ਼ਾਮਲ ਕਰੋ", view_dict = "ਸ਼ਬਦਕੋਸ਼ ਦੇਖੋ", set_end = "ਅੰਤ ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ",
-        ext_lang = "ਐਕਸਟੈਂਸ਼ਨ ਭਾਸ਼ਾ", roman_mode = "ਰੋਮਨ ਟਾਈਪਿੰਗ",
-        roman_on = "ਰੋਮਨ ਟਾਈਪਿੰਗ: ਚਾਲੂ", roman_off = "ਰੋਮਨ ਟਾਈਪਿੰਗ: ਬੰਦ",
+        ext_lang = "ਐਕਸਟੈਂਸ਼ਨ ਭਾਸ਼ਾ",
         about = "ਜਾਣਕਾਰੀ", exit = "ਬਾਹਰ ਜਾਓ", ext_settings = "ਐਕਸਟੈਂਸ਼ਨ ਸੈਟਿੰਗਾਂ",
         sound_effects = "ਆਵਾਜ਼ ਪ੍ਰਭਾਵ", sound_on = "ਆਵਾਜ਼: ਚਾਲੂ", sound_off = "ਆਵਾਜ਼: ਬੰਦ",
         bg_music = "ਪਿਛੋਕੜ ਸੰਗੀਤ", bg_music_on = "ਪਿਛੋਕੜ ਸੰਗੀਤ: ਚਾਲੂ", bg_music_off = "ਪਿਛੋਕੜ ਸੰਗੀਤ: ਬੰਦ",
         volume_control = "ਵਾਲੀਅਮ ਕੰਟਰੋਲ", bg_music_volume = "ਪਿਛੋਕੜ ਸੰਗੀਤ ਵਾਲੀਅਮ",
         sfx_volume = "ਆਵਾਜ਼ ਪ੍ਰਭਾਵ ਵਾਲੀਅਮ", ai_engine = "AI ਇੰਜਣ ਸੈਟਿੰਗਾਂ",
-        follow_tiktok = "TikTok ਅਕਾਊਂਟ ਫਾਲੋ ਕਰੋ", send_feedback = "ਫੀਡਬੈਕ ਭੇਜੋ",
+        follow_tiktok = "TikTok ਫਾਲੋ ਕਰੋ", contact_developer = "ਡਿਵੈਲਪਰ ਨਾਲ ਸੰਪਰਕ ਕਰੋ",
         welcome_title = "AI ਵੌਇਸ ਟਾਈਪਰ ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ", enter_name = "ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਨਾਮ ਦਰਜ ਕਰੋ:",
         your_name = "ਤੁਹਾਡਾ ਨਾਮ", ok = "ਠੀਕ ਹੈ", cancel = "ਰੱਦ ਕਰੋ",
         error = "ਗਲਤੀ", both_required = "ਦੋਵੇਂ ਫ਼ੀਲਡਾਂ ਦੀ ਲੋੜ ਹੈ!", saved = "ਸੇਵ ਹੋਇਆ",
@@ -1184,24 +1221,26 @@ local texts = {
         select_ext_lang = "ਐਕਸਟੈਂਸ਼ਨ ਭਾਸ਼ਾ ਚੁਣੋ",
         welcome_msg = "ਵਰਤੋਂ ਲਈ ਤਿਆਰ ਹੈ।",
         version = "ਵਰਜਨ: 1.1",
-        about_text = "AI ਵੌਇਸ ਟਾਈਪਰ\nਡਿਵੈਲਪਰ: Friends Star\nਵਰਜਨ: 1.1\nਫੀਚਰ:\n• 148 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਵੌਇਸ ਟੂ ਟੈਕਸਟ\n• ਰੋਮਨ ਟਾਈਪਿੰਗ ਮੋਡ\n• ਸ਼ਬਦਕੋਸ਼\n• AI ਇੰਜਣ - 4 ਪ੍ਰੋਵਾਈਡਰ\n• 133 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਅਨੁਵਾਦ\n• ਇਮੋਜੀ ਸਹਾਇਤਾ\n• ਵਿਰਾਮ ਚਿੰਨ੍ਹ ਚਾਲੂ/ਬੰਦ\n• ਆਵਾਜ਼ ਪ੍ਰਭਾਵ ਅਤੇ ਪਿਛੋਕੜ ਸੰਗੀਤ\n\n📱 ਮੇਰੇ ਵਟਸਐਪ ਟਾਕਿੰਗ ਗਰੁੱਪ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ",
-        whatsapp_community = "WhatsApp ਕਮਿਊਨਿਟੀ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ", subscribe_youtube = "YouTube ਚੈਨਲ ਸਬਸਕ੍ਰਾਈਬ ਕਰੋ",
-        follow_telegram = "ਟੈਲੀਗ੍ਰਾਮ ਚੈਨਲ ਜੁਆਇਨ ਕਰੋ", check_update = "ਅੱਪਡੇਟ ਚੈੱਕ ਕਰੋ",
-        join_whatsapp_group = "ਮੇਰੇ ਵਟਸਐਪ ਟਾਕਿੰਗ ਗਰੁੱਪ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ",
+        about_text = "AI ਵੌਇਸ ਟਾਈਪਰ\nਡਿਵੈਲਪਰ: Friends Star\nਵਰਜਨ: 1.1\nਫੀਚਰ:\n• 148 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਵੌਇਸ ਟੂ ਟੈਕਸਟ\n• AI ਇੰਜਣ - 4 ਪ੍ਰੋਵਾਈਡਰ\n• 133 ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਅਨੁਵਾਦ\n• ਇਮੋਜੀ ਸਹਾਇਤਾ\n• ਵਿਰਾਮ ਚਿੰਨ੍ਹ ਚਾਲੂ/ਬੰਦ\n• ਆਵਾਜ਼ ਪ੍ਰਭਾਵ ਅਤੇ ਪਿਛੋਕੜ ਸੰਗੀਤ",
+        whatsapp_community = "WhatsApp ਕਮਿਊਨਿਟੀ", subscribe_youtube = "YouTube ਸਬਸਕ੍ਰਾਈਬ ਕਰੋ",
+        follow_telegram = "ਟੈਲੀਗ੍ਰਾਮ ਚੈਨਲ", check_update = "ਅੱਪਡੇਟ ਚੈੱਕ ਕਰੋ",
+        join_whatsapp_group = "WhatsApp ਟਾਕਿੰਗ ਗਰੁੱਪ",
+        join_whatsapp_channel = "WhatsApp ਚੈਨਲ",
+        join_cricket_group = "ਹੈਂਡ ਕ੍ਰਿਕਟ ਗਰੁੱਪ",
+        join_social_media = "ਸੋਸ਼ਲ ਮੀਡੀਆ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ",
         goodbye = "ਅਲਵਿਦਾ! ਸਾਨੂੰ ਆਪਣੀਆਂ ਦੁਆਵਾਂ ਵਿੱਚ ਯਾਦ ਰੱਖਣਾ।"
     },
     sindhi = {
         app_title = "AI وائس ٽائپر", developer = "ڊولپر: Friends Star",
         select_lang = "ٻولي چونڊيو (148 ٻوليون)", current_lang = "موجوده ٻولي",
         add_dict = "لغت شامل ڪريو", view_dict = "لغت ڏسو", set_end = "آخر ۾ شامل ڪريو",
-        ext_lang = "ايڪسٽينشن ٻولي", roman_mode = "رومن ٽائپنگ",
-        roman_on = "رومن ٽائپنگ: آن", roman_off = "رومن ٽائپنگ: آف",
+        ext_lang = "ايڪسٽينشن ٻولي",
         about = "تعارف", exit = "ٻاهر نڪرو", ext_settings = "ايڪسٽينشن سيٽنگون",
         sound_effects = "آواز جا اثر", sound_on = "آواز: آن", sound_off = "آواز: آف",
         bg_music = "پس منظر موسيقي", bg_music_on = "پس منظر موسيقي: آن", bg_music_off = "پس منظر موسيقي: آف",
         volume_control = "وڌاءَ ڪنٽرول", bg_music_volume = "پس منظر موسيقي وڌاءَ",
         sfx_volume = "آواز جا اثر وڌاءَ", ai_engine = "AI انجڻ سيٽنگون",
-        follow_tiktok = "TikTok اڪائونٽ فالو ڪريو", send_feedback = "راءِ موڪليو",
+        follow_tiktok = "TikTok فالو ڪريو", contact_developer = "ڊولپر سان رابطو ڪريو",
         welcome_title = "AI وائس ٽائپر ۾ ڀليڪار", enter_name = "مهرباني ڪري پنهنجو نالو داخل ڪريو:",
         your_name = "توهان جو نالو", ok = "ٺيڪ", cancel = "منسوخ",
         error = "غلطي", both_required = "ٻنهي فيلڊن جي ضرورت آهي!", saved = "محفوظ",
@@ -1216,10 +1255,13 @@ local texts = {
         select_ext_lang = "ايڪسٽينشن ٻولي چونڊيو",
         welcome_msg = "استعمال لاءِ تيار آهي.",
         version = "ورزن: 1.1",
-        about_text = "AI وائس ٽائپر\nڊولپر: Friends Star\nورزن: 1.1\nفيچرز:\n• 148 ٻولين ۾ وائس ٽو ٽيڪسٽ\n• رومن ٽائپنگ موڊ\n• لغت\n• AI انجڻ - 4 پرووائڊرز\n• 133 ٻولين ۾ ترجمو\n• ايموجي سپورٽ\n• پنڪچويشن آن/آف\n• آواز جا اثر ۽ پس منظر موسيقي\n\n📱 منهنجي واٽس ايپ ٽاڪنگ گروپ ۾ شامل ٿيو",
-        whatsapp_community = "WhatsApp ڪميونٽي ۾ شامل ٿيو", subscribe_youtube = "YouTube چينل سبسڪرائب ڪريو",
-        follow_telegram = "ٽيليگرام چينل جوائن ڪريو", check_update = "اپڊيٽ چيڪ ڪريو",
-        join_whatsapp_group = "منهنجي واٽس ايپ ٽاڪنگ گروپ ۾ شامل ٿيو",
+        about_text = "AI وائس ٽائپر\nڊولپر: Friends Star\nورزن: 1.1\nفيچرز:\n• 148 ٻولين ۾ وائس ٽو ٽيڪسٽ\n• AI انجڻ - 4 پرووائڊرز\n• 133 ٻولين ۾ ترجمو\n• ايموجي سپورٽ\n• پنڪچويشن آن/آف\n• آواز جا اثر ۽ پس منظر موسيقي",
+        whatsapp_community = "WhatsApp ڪميونٽي", subscribe_youtube = "YouTube سبسڪرائب ڪريو",
+        follow_telegram = "ٽيليگرام چينل", check_update = "اپڊيٽ چيڪ ڪريو",
+        join_whatsapp_group = "WhatsApp ٽاڪنگ گروپ",
+        join_whatsapp_channel = "WhatsApp چينل",
+        join_cricket_group = "هينڊ ڪرڪيٽ گروپ",
+        join_social_media = "سوشل ميديا ۾ شامل ٿيو",
         goodbye = "الله حافظ! اسان کي پنهنجين دعائن ۾ ياد رکو."
     }
 }
@@ -1227,8 +1269,8 @@ local texts = {
 function getText(key)
     if texts[extLang] and texts[extLang][key] then
         return texts[extLang][key]
-    elseif texts.urdu[key] then
-        return texts.urdu[key]
+    elseif texts.english[key] then
+        return texts.english[key]
     else
         return key
     end
@@ -1295,8 +1337,6 @@ end
 local changeTable = loadDictionary()
 
 -- ==================== TYPING FUNCTION ====================
-local lastSpokenText = ""
-
 function insertTextIntoAnyTextBox(text)
     local rootNode = service.getRootInActiveWindow()
     if rootNode == nil then return false end
@@ -1364,26 +1404,17 @@ function insertTextIntoAnyTextBox(text)
         success = pcall(function() focusedNode.setText(finalText) end)
     end
     
-    if success and text ~= nil and text ~= "" then
-        pcall(function() service.speak(text) end)
-    end
-    
     return success
-end
-
-function toggleRomanMode()
-    romanModeEnabled = not romanModeEnabled
-    romanPref.edit().putBoolean("roman_mode", romanModeEnabled).apply()
-    Toast.makeText(service, romanModeEnabled and "Roman Typing Mode: ON" or "Roman Typing Mode: OFF", Toast.LENGTH_SHORT).show()
 end
 
 function startTyping()
     if not isAnyApiKeySet() then
-        service.speak("Please set your API key in AI Engine Settings first")
-        return
+        local typingMode = getSelectedTypingMode()
+        if typingMode ~= "Roman Typing Mode" then
+            service.speak("Please set your API key in AI Engine Settings first")
+            return
+        end
     end
-    
-    playClickSound()
     
     local speechRecTemp = SpeechRecognizer.createSpeechRecognizer(service)
     local tempListener = RecognitionListener{
@@ -1392,27 +1423,37 @@ function startTyping()
             if arr and arr.size() > 0 then
                 local txt = arr.get(0)
                 txt = applyDictionaryReplacements(txt)
-                if romanModeEnabled then txt = urduToRoman(txt) end
                 if savedEndText ~= "" then txt = txt .. savedEndText end
                 
-                local provider = getSelectedAIProvider()
-                local hasApiKey = false
-                if provider == "OpenAI" then hasApiKey = getOpenAIApiKey() ~= ""
-                elseif provider == "OpenRouter" then hasApiKey = getOpenRouterApiKey() ~= ""
-                elseif provider == "Gemini" then hasApiKey = getGeminiApiKey() ~= ""
-                else hasApiKey = getGroqApiKey() ~= "" end
+                local typingMode = getSelectedTypingMode()
                 
-                if hasApiKey then
-                    service.speak("Processing...")
-                    processWithAI(txt, function(enhancedText)
-                        local finalText = enhancedText
-                        if savedEndText ~= "" and not finalText:find(savedEndText) then
-                            finalText = finalText .. savedEndText
-                        end
-                        insertTextIntoAnyTextBox(finalText)
-                    end)
+                if typingMode == "Roman Typing Mode" then
+                    local romanText = urduToRoman(txt)
+                    local finalText = romanText
+                    if savedEndText ~= "" and not finalText:find(savedEndText) then
+                        finalText = finalText .. savedEndText
+                    end
+                    insertTextIntoAnyTextBox(finalText)
                 else
-                    insertTextIntoAnyTextBox(txt)
+                    local provider = getSelectedAIProvider()
+                    local hasApiKey = false
+                    if provider == "OpenAI" then hasApiKey = getOpenAIApiKey() ~= ""
+                    elseif provider == "OpenRouter" then hasApiKey = getOpenRouterApiKey() ~= ""
+                    elseif provider == "Gemini" then hasApiKey = getGeminiApiKey() ~= ""
+                    else hasApiKey = getGroqApiKey() ~= "" end
+                    
+                    if hasApiKey then
+                        service.speak("Processing...")
+                        processWithAI(txt, function(enhancedText)
+                            local finalText = enhancedText
+                            if savedEndText ~= "" and not finalText:find(savedEndText) then
+                                finalText = finalText .. savedEndText
+                            end
+                            insertTextIntoAnyTextBox(finalText)
+                        end)
+                    else
+                        insertTextIntoAnyTextBox(txt)
+                    end
                 end
             end
             speechRecTemp.destroy()
@@ -1436,7 +1477,6 @@ function dp(n)
 end
 
 function showDictionary()
-    playClickSound()
     local dict = loadDictionary()
     local listData = {}
     for k, v in pairs(dict) do
@@ -1458,7 +1498,6 @@ function showDictionary()
     local list = ListView(service)
     list.setAdapter(ArrayAdapter(service, android.R.layout.simple_list_item_1, listData))
     list.onItemClick = function(l, v, p, i)
-        playClickSound()
         local itemText = listData[i + 1]
         local key, val = itemText:match("(.+) => (.+)")
         local ed = LuaDialog()
@@ -1500,7 +1539,6 @@ function showDictionary()
 end
 
 function showVolumeControl()
-    playClickSound()
     local d = LuaDialog()
     d.setTitle(getText("volume_control"))
     local mainLayout = LinearLayout(service)
@@ -1545,7 +1583,6 @@ function showVolumeControl()
 end
 
 function showSoundEffectsDialog()
-    playClickSound()
     local d = LuaDialog()
     d.setTitle(getText("sound_effects"))
     local mainLayout = LinearLayout(service)
@@ -1555,7 +1592,6 @@ function showSoundEffectsDialog()
     local bgMusicBtn = Button(service)
     bgMusicBtn.setText(bgMusicEnabled and getText("bg_music_on") or getText("bg_music_off"))
     bgMusicBtn.onClick = function()
-        playClickSound()
         bgMusicEnabled = not bgMusicEnabled
         soundPref.edit().putBoolean("bg_music_enabled", bgMusicEnabled).apply()
         if bgMusicEnabled then startBackgroundMusic() else stopBackgroundMusic() end
@@ -1566,7 +1602,6 @@ function showSoundEffectsDialog()
     local soundBtn = Button(service)
     soundBtn.setText(soundEnabled and getText("sound_on") or getText("sound_off"))
     soundBtn.onClick = function()
-        playClickSound()
         soundEnabled = not soundEnabled
         soundPref.edit().putBoolean("sound_enabled", soundEnabled).apply()
         soundBtn.setText(soundEnabled and getText("sound_on") or getText("sound_off"))
@@ -1599,28 +1634,11 @@ end
 
 -- ==================== SHOW EXTENSION SETTINGS ====================
 function showExtensionSettings()
-    playClickSound()
     local d = LuaDialog()
     d.setTitle(getText("ext_settings"))
     local mainLayout = LinearLayout(service)
     mainLayout.setOrientation(1)
     mainLayout.setPadding(dp(20), dp(20), dp(20), dp(20))
-    
-    local romanBtn = Button(service)
-    romanBtn.setText(romanModeEnabled and getText("roman_on") or getText("roman_off"))
-    romanBtn.setTextSize(14)
-    romanBtn.setBackgroundColor(romanModeEnabled and 0xFF4CAF50 or 0xFFF44336)
-    romanBtn.setPadding(0, 15, 0, 15)
-    local romanParams = LinearLayout.LayoutParams(-1, -2)
-    romanParams.setMargins(0, 0, 0, 10)
-    romanBtn.setLayoutParams(romanParams)
-    romanBtn.onClick = function()
-        playClickSound()
-        toggleRomanMode()
-        d.dismiss()
-        showExtensionSettings()
-    end
-    mainLayout.addView(romanBtn)
     
     local modesBtn = Button(service)
     modesBtn.setText("Select Typing Mode")
@@ -1631,7 +1649,6 @@ function showExtensionSettings()
     modesParams.setMargins(0, 0, 0, 10)
     modesBtn.setLayoutParams(modesParams)
     modesBtn.onClick = function()
-        playClickSound()
         d.dismiss()
         showTypingModesDialog(function() showExtensionSettings() end)
     end
@@ -1654,13 +1671,11 @@ function showExtensionSettings()
     addDictParams.setMargins(0, 0, 0, 10)
     addDictBtn.setLayoutParams(addDictParams)
     addDictBtn.onClick = function()
-        playClickSound()
         local addD = LuaDialog()
         local addLay = { LinearLayout; orientation="vertical"; padding="20dp";
             {EditText; id="w"; hint=getText("wrong_word");};
             {EditText; id="c"; hint=getText("correct_word");};
             {Button; text=getText("save"); onClick=function()
-                playClickSound()
                 local wrong = w.getText().toString()
                 local correct = c.getText().toString()
                 if wrong ~= "" and correct ~= "" then
@@ -1690,7 +1705,6 @@ function showExtensionSettings()
     viewDictParams.setMargins(0, 0, 0, 10)
     viewDictBtn.setLayoutParams(viewDictParams)
     viewDictBtn.onClick = function()
-        playClickSound()
         d.dismiss()
         showDictionary()
     end
@@ -1705,7 +1719,6 @@ function showExtensionSettings()
     setEndParams.setMargins(0, 0, 0, 10)
     setEndBtn.setLayoutParams(setEndParams)
     setEndBtn.onClick = function()
-        playClickSound()
         local endD = LuaDialog()
         local currentDisplay = getText("current") .. ": "
         if savedEndText == "" then currentDisplay = currentDisplay .. getText("nothing")
@@ -1746,7 +1759,6 @@ function showExtensionSettings()
     extLangParams.setMargins(0, 0, 0, 10)
     extLangBtn.setLayoutParams(extLangParams)
     extLangBtn.onClick = function()
-        playClickSound()
         local langD = LuaDialog()
         local langButtons = LinearLayout(service)
         langButtons.setOrientation(1)
@@ -1762,7 +1774,6 @@ function showExtensionSettings()
             params.setMargins(0, 0, 0, 10)
             btn.setLayoutParams(params)
             btn.onClick = function()
-                playClickSound()
                 updateExtensionLanguage(lang.code)
                 langD.dismiss()
                 d.dismiss()
@@ -1777,7 +1788,6 @@ function showExtensionSettings()
         cancelBtn.setBackgroundColor(0xFFF44336)
         cancelBtn.setPadding(0, 15, 0, 15)
         cancelBtn.onClick = function()
-            playClickSound()
             langD.dismiss()
         end
         langButtons.addView(cancelBtn)
@@ -1796,7 +1806,6 @@ function showExtensionSettings()
     aiParams.setMargins(0, 0, 0, 10)
     aiBtn.setLayoutParams(aiParams)
     aiBtn.onClick = function()
-        playClickSound()
         d.dismiss()
         showAISettingsDialog(function() showExtensionSettings() end)
     end
@@ -1812,7 +1821,6 @@ function showExtensionSettings()
     punctParams.setMargins(0, 0, 0, 10)
     punctuationBtn.setLayoutParams(punctParams)
     punctuationBtn.onClick = function()
-        playClickSound()
         local newState = not isPunctuationEnabled()
         setPunctuationEnabled(newState)
         punctuationBtn.setText(newState and "Punctuation: ON (. ? ! ,)" or "Punctuation: OFF")
@@ -1831,7 +1839,6 @@ function showExtensionSettings()
     emojiParams.setMargins(0, 0, 0, 10)
     emojiBtn.setLayoutParams(emojiParams)
     emojiBtn.onClick = function()
-        playClickSound()
         local newState = not isEmojiEnabled()
         setEmojiEnabled(newState)
         emojiBtn.setText(newState and "Emoji: ON 😊" or "Emoji: OFF")
@@ -1840,7 +1847,6 @@ function showExtensionSettings()
     end
     mainLayout.addView(emojiBtn)
     
-    -- Check for Updates Button
     local updateBtn = Button(service)
     updateBtn.setText(getText("check_update"))
     updateBtn.setTextSize(14)
@@ -1850,7 +1856,6 @@ function showExtensionSettings()
     updateParams.setMargins(0, 0, 0, 10)
     updateBtn.setLayoutParams(updateParams)
     updateBtn.onClick = function()
-        playClickSound()
         service.speak("Checking for updates...")
         checkForUpdate(true)
     end
@@ -1865,7 +1870,6 @@ function showExtensionSettings()
     soundParams.setMargins(0, 0, 0, 10)
     soundEffectsBtn.setLayoutParams(soundParams)
     soundEffectsBtn.onClick = function()
-        playClickSound()
         showSoundEffectsDialog()
     end
     mainLayout.addView(soundEffectsBtn)
@@ -1876,7 +1880,6 @@ function showExtensionSettings()
     backToMenuBtn.setBackgroundColor(0xFFF44336)
     backToMenuBtn.setPadding(0, 15, 0, 15)
     backToMenuBtn.onClick = function()
-        playClickSound()
         d.dismiss()
         showMainDialog()
     end
@@ -1897,7 +1900,6 @@ function showTypingModesDialog(parentDlg)
     
     local currentMode = getSelectedTypingMode()
     
-    -- Mode 1: Conversion Mode
     local convBtn = Button(service)
     if currentMode == "Conversion Mode" then
         convBtn.setText("✓ Conversion Mode (Active)")
@@ -1912,7 +1914,6 @@ function showTypingModesDialog(parentDlg)
     convParams.setMargins(0, 0, 0, 10)
     convBtn.setLayoutParams(convParams)
     convBtn.onClick = function()
-        playClickSound()
         saveSelectedTypingMode("Conversion Mode")
         service.speak("Conversion Mode selected - Country names to English with flags")
         dlg.dismiss()
@@ -1929,7 +1930,6 @@ function showTypingModesDialog(parentDlg)
     convDesc.setPadding(5, 0, 5, 15)
     layout.addView(convDesc)
     
-    -- Mode 2: Intelligent Writer Mode
     local intBtn = Button(service)
     if currentMode == "Intelligent Writer Mode" then
         intBtn.setText("✓ Intelligent Writer Mode (Active)")
@@ -1944,7 +1944,6 @@ function showTypingModesDialog(parentDlg)
     intParams.setMargins(0, 0, 0, 10)
     intBtn.setLayoutParams(intParams)
     intBtn.onClick = function()
-        playClickSound()
         saveSelectedTypingMode("Intelligent Writer Mode")
         service.speak("Intelligent Writer Mode selected - Text enhancement with punctuation")
         dlg.dismiss()
@@ -1961,7 +1960,6 @@ function showTypingModesDialog(parentDlg)
     intDesc.setPadding(5, 0, 5, 15)
     layout.addView(intDesc)
     
-    -- Mode 3: Only Selected Language Mode
     local onlyLangBtn = Button(service)
     if currentMode == "Only Selected Language Mode" then
         onlyLangBtn.setText("✓ Only Selected Language Mode (Active)")
@@ -1976,7 +1974,6 @@ function showTypingModesDialog(parentDlg)
     onlyLangParams.setMargins(0, 0, 0, 10)
     onlyLangBtn.setLayoutParams(onlyLangParams)
     onlyLangBtn.onClick = function()
-        playClickSound()
         saveSelectedTypingMode("Only Selected Language Mode")
         local selectedLang = getLanguageNameFromCode(savedLang)
         service.speak("Only Selected Language Mode selected - Converting speech to " .. selectedLang)
@@ -1994,13 +1991,42 @@ function showTypingModesDialog(parentDlg)
     onlyLangDesc.setPadding(5, 0, 5, 15)
     layout.addView(onlyLangDesc)
     
+    local romanModeBtn = Button(service)
+    if currentMode == "Roman Typing Mode" then
+        romanModeBtn.setText("✓ Roman Typing Mode (Active)")
+        romanModeBtn.setBackgroundColor(0xFF4CAF50)
+    else
+        romanModeBtn.setText("Roman Typing Mode")
+        romanModeBtn.setBackgroundColor(0xFF2196F3)
+    end
+    romanModeBtn.setTextSize(14)
+    romanModeBtn.setPadding(0, 15, 0, 15)
+    local romanModeParams = LinearLayout.LayoutParams(-1, -2)
+    romanModeParams.setMargins(0, 0, 0, 10)
+    romanModeBtn.setLayoutParams(romanModeParams)
+    romanModeBtn.onClick = function()
+        saveSelectedTypingMode("Roman Typing Mode")
+        service.speak("Roman Typing Mode selected - Converting speech to Roman English (No AI needed)")
+        dlg.dismiss()
+        if parentDlg and type(parentDlg) == "function" then
+            parentDlg()
+        end
+    end
+    layout.addView(romanModeBtn)
+    
+    local romanModeDesc = TextView(service)
+    romanModeDesc.setText("Converts speech to Complete Roman English - Fast & Offline (e.g., 'aap kaise hain')")
+    romanModeDesc.setTextSize(11)
+    romanModeDesc.setTextColor(0xFFAAAAAA)
+    romanModeDesc.setPadding(5, 0, 5, 15)
+    layout.addView(romanModeDesc)
+    
     local backBtn = Button(service)
     backBtn.setText("🔘 Back to Extension Settings")
     backBtn.setTextSize(14)
     backBtn.setBackgroundColor(0xFFF44336)
     backBtn.setPadding(0, 15, 0, 15)
     backBtn.onClick = function()
-        playClickSound()
         dlg.dismiss()
         if parentDlg and type(parentDlg) == "function" then
             parentDlg()
@@ -2347,7 +2373,6 @@ function showAISettingsDialog(mainDlg)
     mainLayout.addView(geminiLayout)
     mainLayout.addView(groqLayout)
     
-    -- Translation Settings
     local transLabel = TextView(service)
     transLabel.setText("Translation Settings")
     transLabel.setTextSize(16)
@@ -2515,72 +2540,177 @@ function urlEncode(str)
     return str:gsub(" ", "%%20"):gsub(":", "%%3A"):gsub("/", "%%2F"):gsub("&", "%%26"):gsub("=", "%%3D"):gsub("?", "%%3F")
 end
 
-function sendFeedback()
-    playClickSound()
-    local d = LuaDialog()
-    d.setTitle(getText("send_feedback"))
-    local lay = {
-        LinearLayout; orientation="vertical"; padding="20dp";
-        {EditText; id="nameInput"; hint="Your Name";};
-        {EditText; id="feedbackInput"; hint="Your Feedback"; lines="4";};
-        {LinearLayout; orientation="horizontal";
-            {Button; text="Submit"; onClick=function()
-                local name = nameInput.getText().toString()
-                local feedback = feedbackInput.getText().toString()
-                if name ~= "" and feedback ~= "" then
-                    local msg = "Name: " .. name .. "\nFeedback: " .. feedback
-                    local encoded = urlEncode(msg)
-                    local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/923165846181?text=" .. encoded))
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    service.startActivity(intent)
-                    d.dismiss()
-                end
-            end};
-            {Button; text=getText("cancel"); onClick=function() d.dismiss() end};
-        };
-    }
-    d.setView(loadlayout(lay))
-    d.show()
+function contactDeveloper()
+    local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/923165846181"))
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    service.startActivity(intent)
 end
 
 function followTikTok()
-    playClickSound()
     local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com/@urdustorees"))
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     service.startActivity(intent)
 end
 
+function joinWhatsAppChannel()
+    local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://whatsapp.com/channel/0029Vb7IpqF23n3oxCl4ts25"))
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    service.startActivity(intent)
+end
+
 function joinWhatsAppCommunity()
-    playClickSound()
     local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/CIov5nwVSkGA6R4Aya44Ff"))
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     service.startActivity(intent)
 end
 
 function joinWhatsAppTalkingGroup()
-    playClickSound()
     local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/CIov5nwVSkGA6R4Aya44Ff"))
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     service.startActivity(intent)
 end
 
+function joinCricketGroup()
+    local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/IKSve9J4Dn4HONC4VZ02Qy"))
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    service.startActivity(intent)
+end
+
 function followYouTube()
-    playClickSound()
     local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com/@accessibletechvision"))
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     service.startActivity(intent)
 end
 
 function followTelegram()
-    playClickSound()
     local intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/techwithmohsin"))
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     service.startActivity(intent)
 end
 
+function showSocialMediaDialog()
+    local dlg = LuaDialog(service)
+    dlg.setTitle(getText("join_social_media"))
+    dlg.setCancelable(true)
+    
+    local layout = LinearLayout(service)
+    layout.setOrientation(1)
+    layout.setPadding(20, 20, 20, 20)
+    
+    local whatsappChannelBtn = Button(service)
+    whatsappChannelBtn.setText("📱 " .. getText("join_whatsapp_channel"))
+    whatsappChannelBtn.setTextSize(14)
+    whatsappChannelBtn.setBackgroundColor(0xFF25D366)
+    whatsappChannelBtn.setPadding(0, 15, 0, 15)
+    local waChanParams = LinearLayout.LayoutParams(-1, -2)
+    waChanParams.setMargins(0, 0, 0, 10)
+    whatsappChannelBtn.setLayoutParams(waChanParams)
+    whatsappChannelBtn.onClick = function()
+        joinWhatsAppChannel()
+        dlg.dismiss()
+    end
+    layout.addView(whatsappChannelBtn)
+    
+    local whatsappCommunityBtn = Button(service)
+    whatsappCommunityBtn.setText("👥 " .. getText("whatsapp_community"))
+    whatsappCommunityBtn.setTextSize(14)
+    whatsappCommunityBtn.setBackgroundColor(0xFF25D366)
+    whatsappCommunityBtn.setPadding(0, 15, 0, 15)
+    local waCommParams = LinearLayout.LayoutParams(-1, -2)
+    waCommParams.setMargins(0, 0, 0, 10)
+    whatsappCommunityBtn.setLayoutParams(waCommParams)
+    whatsappCommunityBtn.onClick = function()
+        joinWhatsAppCommunity()
+        dlg.dismiss()
+    end
+    layout.addView(whatsappCommunityBtn)
+    
+    local whatsappGroupBtn = Button(service)
+    whatsappGroupBtn.setText("💬 " .. getText("join_whatsapp_group"))
+    whatsappGroupBtn.setTextSize(14)
+    whatsappGroupBtn.setBackgroundColor(0xFF25D366)
+    whatsappGroupBtn.setPadding(0, 15, 0, 15)
+    local waGroupParams = LinearLayout.LayoutParams(-1, -2)
+    waGroupParams.setMargins(0, 0, 0, 10)
+    whatsappGroupBtn.setLayoutParams(waGroupParams)
+    whatsappGroupBtn.onClick = function()
+        joinWhatsAppTalkingGroup()
+        dlg.dismiss()
+    end
+    layout.addView(whatsappGroupBtn)
+    
+    local cricketGroupBtn = Button(service)
+    cricketGroupBtn.setText("🏏 " .. getText("join_cricket_group"))
+    cricketGroupBtn.setTextSize(14)
+    cricketGroupBtn.setBackgroundColor(0xFF25D366)
+    cricketGroupBtn.setPadding(0, 15, 0, 15)
+    local cricketParams = LinearLayout.LayoutParams(-1, -2)
+    cricketParams.setMargins(0, 0, 0, 10)
+    cricketGroupBtn.setLayoutParams(cricketParams)
+    cricketGroupBtn.onClick = function()
+        joinCricketGroup()
+        dlg.dismiss()
+    end
+    layout.addView(cricketGroupBtn)
+    
+    local tiktokBtn = Button(service)
+    tiktokBtn.setText("🎵 " .. getText("follow_tiktok"))
+    tiktokBtn.setTextSize(14)
+    tiktokBtn.setBackgroundColor(0xFF000000)
+    tiktokBtn.setPadding(0, 15, 0, 15)
+    local ttParams = LinearLayout.LayoutParams(-1, -2)
+    ttParams.setMargins(0, 0, 0, 10)
+    tiktokBtn.setLayoutParams(ttParams)
+    tiktokBtn.onClick = function()
+        followTikTok()
+        dlg.dismiss()
+    end
+    layout.addView(tiktokBtn)
+    
+    local telegramBtn = Button(service)
+    telegramBtn.setText("📱 " .. getText("follow_telegram"))
+    telegramBtn.setTextSize(14)
+    telegramBtn.setBackgroundColor(0xFF0088CC)
+    telegramBtn.setPadding(0, 15, 0, 15)
+    local tgParams = LinearLayout.LayoutParams(-1, -2)
+    tgParams.setMargins(0, 0, 0, 10)
+    telegramBtn.setLayoutParams(tgParams)
+    telegramBtn.onClick = function()
+        followTelegram()
+        dlg.dismiss()
+    end
+    layout.addView(telegramBtn)
+    
+    local youtubeBtn = Button(service)
+    youtubeBtn.setText("📺 " .. getText("subscribe_youtube"))
+    youtubeBtn.setTextSize(14)
+    youtubeBtn.setBackgroundColor(0xFFFF0000)
+    youtubeBtn.setPadding(0, 15, 0, 15)
+    local ytParams = LinearLayout.LayoutParams(-1, -2)
+    ytParams.setMargins(0, 0, 0, 10)
+    youtubeBtn.setLayoutParams(ytParams)
+    youtubeBtn.onClick = function()
+        followYouTube()
+        dlg.dismiss()
+    end
+    layout.addView(youtubeBtn)
+    
+    local closeBtn = Button(service)
+    closeBtn.setText("🔘 " .. getText("close"))
+    closeBtn.setTextSize(14)
+    closeBtn.setBackgroundColor(0xFFF44336)
+    closeBtn.setPadding(0, 15, 0, 15)
+    closeBtn.onClick = function()
+        dlg.dismiss()
+    end
+    layout.addView(closeBtn)
+    
+    dlg.setView(layout)
+    dlg.show()
+end
+
 local aboutDialog = nil
 function showAbout()
-    playClickSound()
     if aboutDialog ~= nil then
         aboutDialog.dismiss()
         aboutDialog = nil
@@ -2592,13 +2722,9 @@ function showAbout()
         {ScrollView;
             {TextView; text = getText("about_text");};
         };
-        {Button; text = getText("send_feedback"); onClick = function() aboutDialog.dismiss(); sendFeedback() end};
-        {Button; text = getText("follow_tiktok"); onClick = function() aboutDialog.dismiss(); followTikTok() end};
-        {Button; text = getText("subscribe_youtube"); onClick = function() aboutDialog.dismiss(); followYouTube() end};
-        {Button; text = getText("follow_telegram"); onClick = function() aboutDialog.dismiss(); followTelegram() end};
-        {Button; text = getText("join_whatsapp_group"); onClick = function() aboutDialog.dismiss(); joinWhatsAppTalkingGroup() end};
-        {Button; text = getText("whatsapp_community"); onClick = function() aboutDialog.dismiss(); joinWhatsAppCommunity() end};
-        {Button; text = "🔘 Back to Main Menu"; onClick = function() aboutDialog.dismiss(); showMainDialog() end};
+        {Button; text = getText("contact_developer"); onClick = function() aboutDialog.dismiss(); contactDeveloper() end};
+        {Button; text = getText("join_social_media"); onClick = function() aboutDialog.dismiss(); showSocialMediaDialog() end};
+        {Button; text = "🔘 " .. getText("close"); onClick = function() aboutDialog.dismiss(); showMainDialog() end};
     }
     aboutDialog.setView(loadlayout(layout))
     aboutDialog.show()
@@ -2606,7 +2732,7 @@ end
 
 local mainDialog = nil
 function showMainDialog()
-    playClickSound()
+    playOpenSound()
     
     if isAnyTextBoxFocused() then
         startTyping()
@@ -2630,7 +2756,6 @@ function showMainDialog()
     selectedLangName = getLanguageNameFromCode(savedLang)
     table.insert(mainLayoutItems, {TextView; text = getText("current_lang") .. ": " .. selectedLangName; gravity = "center"; textColor = "#4CAF50";})
     table.insert(mainLayoutItems, {Button; text = getText("select_lang"); onClick = function()
-        playClickSound()
         local localDlg = LuaDialog()
         local lay = { LinearLayout; orientation = "vertical"; padding = "15dp";
             {EditText; id = "searchBox"; hint = "Search language...";};
@@ -2642,7 +2767,6 @@ function showMainDialog()
             listView.setAdapter(ArrayAdapter(service, android.R.layout.simple_list_item_1, filterLangs(tostring(s)))) 
         end }
         listView.onItemClick = function(l, v, p, i)
-            playClickSound()
             local itemText = tostring(v.getText())
             local code = itemText:match("=(.+)")
             if code then
@@ -2659,13 +2783,11 @@ function showMainDialog()
         localDlg.show()
     end})
     table.insert(mainLayoutItems, {Button; text = getText("ext_settings"); onClick = function()
-        playClickSound()
         mainDialog.dismiss()
         showExtensionSettings()
     end})
-    table.insert(mainLayoutItems, {Button; text = getText("about"); onClick = function() playClickSound(); mainDialog.dismiss(); showAbout() end})
+    table.insert(mainLayoutItems, {Button; text = getText("about"); onClick = function() mainDialog.dismiss(); showAbout() end})
     table.insert(mainLayoutItems, {Button; text = getText("exit"); onClick = function()
-        playClickSound()
         playSound(exitSoundPath)
         stopBackgroundMusic()
         service.speak(getText("goodbye"))
@@ -2704,9 +2826,7 @@ end
 if hasName == false then
     showWelcomeDialog()
 else
-    playSound(openSoundPath)
     startBackgroundMusic()
-    -- Check for updates in background (without showing message if no update)
     pcall(function()
         checkForUpdate(false)
     end)
